@@ -1,0 +1,113 @@
+#! /bin/bash
+
+# Simple formatting
+bold=$(tput bold)
+normal=$(tput sgr0)
+
+# Help
+function Help() {
+    cat <<HELP
+
+Usage:
+
+$(basename $0) ${bold}-i${normal} Input image ${bold}-s${normal} sigma (optional)
+
+--------------------------------------------------------------------------------
+Input arguments:
+
+    -i: Input image ( e.g. /path/to/source/noisy_3d_image.nii.gz )
+
+    -s: sigma (optional)
+
+--------------------------------------------------------------------------------
+
+Example:
+
+$(basename $0) -i /data/noisy_3d_image.nii.gz
+
+--------------------------------------------------------------------------------
+Script was created by: Sriranga Kashyap (06-2020), kashyap.sriranga@gmail.com
+--------------------------------------------------------------------------------
+
+HELP
+    exit 1
+}
+
+# Check for flag
+if [[ "$1" == "-h" || $# -eq 0 ]]; then
+    Help >&2
+fi
+
+# Get some info
+Fversion=$(cat -v ${FSLDIR}/etc/fslversion)
+runDate=$(echo $(date))
+
+
+# Parse input arguments
+while getopts "h:i:s:" OPT; do
+    case $OPT in
+        h) #help
+            Help
+            exit 0
+        ;;
+        i) # Input image
+            input_image=$OPTARG
+        ;;
+        s) # Rebias boolean
+            sigma=$OPTARG
+        ;;
+        \?) # report error
+            echo "$HELP" >&2
+            exit 1
+        ;;
+    esac
+done
+
+echo " "
+echo "++++ ${bold}autoSUSAN${normal} using FSL version $Fversion ++++"
+echo " "
+
+# Check extension
+if [ ${input_image##*.} = gz ]; then
+    input_basename=$(basename $input_image .nii.gz)
+else
+    input_basename=$(basename $input_image .nii)
+fi
+
+# get robust range
+echo "++ Identifying robust range"
+
+robust_range=`fslstats $input_image -r`
+
+# make string to array
+robust_range=($robust_range)
+
+# get vals
+robust_min=${robust_range[0]}
+robust_max=${robust_range[1]}
+
+echo "++ Intensity mininum = $robust_min"
+echo "++ Intensity maximum = $robust_max"
+
+brightness_threshold=`awk "BEGIN {robust_diff=$robust_max-$robust_min; bt=robust_diff*0.1; print bt}"`
+
+echo "++ Brightness threshold = $brightness_threshold"
+
+if [ ! -z "$sigma" ]; then
+
+    echo "++ Running SUSAN with $sigma HWHM"
+
+    susan $input_image $brightness_threshold $sigma 3 1 0 ${input_basename}_susan.nii
+
+else
+
+    sigma=0
+
+    echo "++ Running SUSAN with $sigma HWHM"
+
+    susan $input_image $brightness_threshold $sigma 3 1 0 ${input_basename}_susan.nii
+    
+fi
+
+echo ""
+echo "++++ Done."
