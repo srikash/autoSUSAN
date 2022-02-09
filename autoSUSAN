@@ -64,20 +64,19 @@ while getopts "h:i:s:" OPT; do
 done
 
 echo " "
-echo "++++ ${bold}autoSUSAN${normal} using FSL version $Fversion ++++"
+echo "++++ ${bold}autoSUSAN${normal} ++++"
+echo " FSL version $Fversion "
+echo " $runDate "
+echo " $input_image "
 echo " "
 
 # Check extension
-if [ ${input_image##*.} = gz ]; then
-    input_basename=$(basename $input_image .nii.gz)
-else
-    input_basename=$(basename $input_image .nii)
-fi
+input_basename=$(remove_ext $input_image)
 
 # get robust range
 echo "++ Identifying robust range"
 
-robust_range=`fslstats $input_image -r`
+robust_range=$(fslstats $input_image -r)
 
 # make string to array
 robust_range=($robust_range)
@@ -89,7 +88,7 @@ robust_max=${robust_range[1]}
 echo "++ Intensity mininum = $robust_min"
 echo "++ Intensity maximum = $robust_max"
 
-brightness_threshold=`awk "BEGIN {robust_diff=$robust_max-$robust_min; bt=robust_diff*0.1; print bt}"`
+brightness_threshold=$(awk "BEGIN {robust_diff=$robust_max-$robust_min; bt=robust_diff*0.1; print bt}")
 
 echo "++ Brightness threshold = $brightness_threshold"
 
@@ -97,9 +96,9 @@ if [ ! -z "$fwhm" ]; then
 
     sigma=$(awk "BEGIN {printf \"%.8f\",${fwhm}/2.355}")
 
-    echo "++ Running SUSAN with $fwhm mm or sigma of $sigma"
+    echo "++ Running SUSAN with $fwhm mm or $sigma sigma"
 
-    susan $input_image $brightness_threshold $sigma 3 1 1 ${input_basename}_susan.nii
+    susan $input_image $brightness_threshold $sigma 3 1 0 ${input_basename}_susan.nii.gz
 
 else
     # Assuming a FWHM 0.5 mm
@@ -107,7 +106,7 @@ else
 
     echo "++ Running SUSAN with sigma $sigma"
 
-    susan $input_image $brightness_threshold $sigma 3 1 1 ${input_basename}_susan.nii
+    susan $input_image $brightness_threshold $sigma 3 1 0 ${input_basename}_susan.nii.gz
     
 fi
 
